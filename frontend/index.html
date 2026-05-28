@@ -1,0 +1,69 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Taskbase API</title>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <header>
+    <div class="container header-inner">
+      <h1 class="logo">Taskbase API</h1>
+      <div class="connection-status" id="connectionStatus"></div>
+    </div>
+  </header>
+
+  <main class="container">
+    <section class="stats-bar" id="statsBar">
+      <div class="stat"><span class="stat-label">Total</span><span class="stat-value" id="statTotal">0</span></div>
+      <div class="stat"><span class="stat-label">Todo</span><span class="stat-value stat-todo" id="statTodo">0</span></div>
+      <div class="stat"><span class="stat-label">In Progress</span><span class="stat-value stat-progress" id="statProgress">0</span></div>
+      <div class="stat"><span class="stat-label">Done</span><span class="stat-value stat-done" id="statDone">0</span></div>
+    </section>
+
+    <section class="form-section">
+      <form id="taskForm">
+        <div class="form-row">
+          <input type="text" id="titleInput" placeholder="Task title" required maxlength="200" />
+          <input type="text" id="descriptionInput" placeholder="Description (optional)" />
+          <button type="submit" id="submitBtn">Add Task</button>
+        </div>
+      </form>
+    </section>
+
+    <section class="controls">
+      <div class="filter-group">
+        <label for="statusFilter">Filter</label>
+        <select id="statusFilter">
+          <option value="all">All</option>
+          <option value="todo">Todo</option>
+          <option value="in-progress">In Progress</option>
+          <option value="done">Done</option>
+        </select>
+      </div>
+      <div class="filter-group">
+        <label for="sortOrder">Sort</label>
+        <select id="sortOrder">
+          <option value="desc">Newest</option>
+          <option value="asc">Oldest</option>
+        </select>
+      </div>
+    </section>
+
+    <section class="tasks-section">
+      <div id="loadingIndicator" class="loading hidden">Loading tasks...</div>
+      <div id="emptyState" class="empty-state hidden">
+        <p>No tasks yet. Create one above.</p>
+      </div>
+      <div id="errorState" class="error-state hidden">
+        <p>Unable to connect to the server.</p>
+        <p class="sub-text">Running in offline mode. Data will not be persisted.</p>
+      </div>
+      <div id="taskList" class="task-list"></div>
+    </section>
+  </main>
+
+  <script src="app.js"></script>
+</body>
+</html>
