@@ -17,6 +17,7 @@ const statusFilter = document.getElementById('statusFilter');
 const priorityFilter = document.getElementById('priorityFilter');
 const sortOrder = document.getElementById('sortOrder');
 const searchInput = document.getElementById('searchInput');
+const connectionStatus = document.getElementById('connectionStatus');
 const statTotal = document.getElementById('statTotal');
 const statTodo = document.getElementById('statTodo');
 const statProgress = document.getElementById('statProgress');
@@ -49,12 +50,15 @@ async function apiRequest(path, options = {}) {
       throw new Error(data.error || 'Request failed');
     }
 
+    isOnline = true;
+    updateConnectionStatus();
     return data;
   } catch (err) {
     if (!isOnline) {
       return mockRequest(path, options);
     }
     isOnline = false;
+    updateConnectionStatus();
     return mockRequest(path, options);
   }
 }
@@ -116,6 +120,16 @@ function computeStats(data) {
     in_progress: data.filter(t => t.status === 'in-progress').length,
     done: data.filter(t => t.status === 'done').length,
   };
+}
+
+function updateConnectionStatus() {
+  if (isOnline) {
+    connectionStatus.textContent = 'Connected';
+    connectionStatus.className = 'connection-status online';
+  } else {
+    connectionStatus.textContent = 'Offline';
+    connectionStatus.className = 'connection-status offline';
+  }
 }
 
 function showLoading() {
@@ -317,4 +331,5 @@ searchInput.addEventListener('input', () => {
   searchTimeout = setTimeout(renderTasks, 200);
 });
 
+updateConnectionStatus();
 loadTasks();

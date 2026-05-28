@@ -64,6 +64,25 @@ header {
   color: var(--text);
 }
 
+.connection-status {
+  font-size: 0.75rem;
+  padding: 3px 10px;
+  border-radius: 10px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  color: var(--text-muted);
+}
+
+.connection-status.online {
+  color: var(--done);
+  border-color: var(--done);
+}
+
+.connection-status.offline {
+  color: var(--text-muted);
+  border-color: var(--border);
+}
+
 .stats-bar {
   display: grid;
   grid-template-columns: repeat(4, 1fr);
