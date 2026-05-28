@@ -15,7 +15,7 @@ app.get('/api/health', (_req, res) => {
   res.json({ status: 'ok' });
 });
 
-const frontendPath = path.join(__dirname, '..', '..', 'frontend');
+const frontendPath = path.join(__dirname, '..', '..');
 app.use(express.static(frontendPath));
 
 app.get('*', (_req, res) => {
