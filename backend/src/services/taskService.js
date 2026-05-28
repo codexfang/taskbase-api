@@ -39,7 +39,7 @@ class TaskService {
   }
 
   static async getById(id) {
-    const task = TaskModel.findById(id);
+    const task = await TaskModel.findById(id);
     if (!task) {
       const err = new Error('Task not found');
       err.status = 404;
@@ -65,7 +65,7 @@ class TaskService {
   }
 
   static async update(id, data) {
-    const existing = TaskModel.findById(id);
+    const existing = await TaskModel.findById(id);
     if (!existing) {
       const err = new Error('Task not found');
       err.status = 404;
@@ -101,7 +101,7 @@ class TaskService {
   }
 
   static async delete(id) {
-    const task = TaskModel.delete(id);
+    const task = await TaskModel.delete(id);
     if (!task) {
       const err = new Error('Task not found');
       err.status = 404;

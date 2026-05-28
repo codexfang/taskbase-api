@@ -1,8 +1,8 @@
-const db = require('../database/db');
+const db = require('../database/client');
 
 class TaskModel {
-  static findAll(filters = {}) {
-    let query = 'SELECT * FROM tasks';
+  static async findAll(filters = {}) {
+    let sql = 'SELECT * FROM tasks';
     const conditions = [];
     const params = [];
 
@@ -22,38 +22,37 @@ class TaskModel {
     }
 
     if (conditions.length > 0) {
-      query += ' WHERE ' + conditions.join(' AND ');
+      sql += ' WHERE ' + conditions.join(' AND ');
     }
 
     const sortBy = filters.sortBy === 'created_at' ? 'created_at' : 'created_at';
     const order = filters.order === 'asc' ? 'ASC' : 'DESC';
-    query += ` ORDER BY ${sortBy} ${order}`;
+    sql += ` ORDER BY ${sortBy} ${order}`;
 
-    let data = db.prepare(query).all(...params);
+    let data = await db.query(sql, params);
 
     if (filters.limit) {
-      const limit = parseInt(filters.limit, 10) || 50;
-      const offset = parseInt(filters.offset, 10) || 0;
+      const limit = Math.min(Math.max(parseInt(filters.limit, 10) || 50, 1), 100);
+      const offset = Math.max(parseInt(filters.offset, 10) || 0, 0);
       data = data.slice(offset, offset + limit);
     }
 
     return data;
   }
 
-  static findById(id) {
-    return db.prepare('SELECT * FROM tasks WHERE id = ?').get(id);
+  static async findById(id) {
+    return db.get('SELECT * FROM tasks WHERE id = ?', [id]);
   }
 
-  static create(task) {
-    const stmt = db.prepare(`
-      INSERT INTO tasks (id, title, description, status, priority, created_at, updated_at)
-      VALUES (?, ?, ?, ?, ?, ?, ?)
-    `);
-    stmt.run(task.id, task.title, task.description, task.status, task.priority, task.createdAt, task.updatedAt);
+  static async create(task) {
+    await db.run(
+      'INSERT INTO tasks (id, title, description, status, priority, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?)',
+      [task.id, task.title, task.description, task.status, task.priority, task.createdAt, task.updatedAt]
+    );
     return this.findById(task.id);
   }
 
-  static update(id, fields) {
+  static async update(id, fields) {
     const sets = [];
     const params = [];
 
@@ -76,23 +75,22 @@ class TaskModel {
 
     if (sets.length === 0) return this.findById(id);
 
-    sets.push("updated_at = datetime('now')");
+    sets.push('updated_at = datetime(\'now\')');
     params.push(id);
 
-    const query = `UPDATE tasks SET ${sets.join(', ')} WHERE id = ?`;
-    db.prepare(query).run(...params);
+    await db.run(`UPDATE tasks SET ${sets.join(', ')} WHERE id = ?`, params);
     return this.findById(id);
   }
 
-  static delete(id) {
-    const task = this.findById(id);
+  static async delete(id) {
+    const task = await this.findById(id);
     if (task) {
-      db.prepare('DELETE FROM tasks WHERE id = ?').run(id);
+      await db.run('DELETE FROM tasks WHERE id = ?', [id]);
     }
     return task;
   }
 
-  static getStats(filters = {}) {
+  static async getStats(filters = {}) {
     const conditions = [];
     const params = [];
 
@@ -113,24 +111,23 @@ class TaskModel {
 
     const where = conditions.length > 0 ? ' WHERE ' + conditions.join(' AND ') : '';
 
-    const row = db.prepare(`
+    return db.get(`
       SELECT
         COUNT(*) AS total,
         COALESCE(SUM(CASE WHEN status = 'todo' THEN 1 ELSE 0 END), 0) AS todo,
         COALESCE(SUM(CASE WHEN status = 'in-progress' THEN 1 ELSE 0 END), 0) AS in_progress,
         COALESCE(SUM(CASE WHEN status = 'done' THEN 1 ELSE 0 END), 0) AS done
       FROM tasks${where}
-    `).get(...params);
-    return row;
+    `, params);
   }
 
-  static getPriorities() {
-    return db.prepare(`
+  static async getPriorities() {
+    return db.query(`
       SELECT priority, COUNT(*) AS count
       FROM tasks
       GROUP BY priority
       ORDER BY CASE priority WHEN 'high' THEN 0 WHEN 'medium' THEN 1 WHEN 'low' THEN 2 END
-    `).all();
+    `);
   }
 }
 
