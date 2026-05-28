@@ -3,17 +3,20 @@ const API_BASE = window.TASKBASE_API_URL || '/api';
 let tasks = [];
 let isOnline = true;
 let mockData = [];
+let searchTimeout = null;
 
 const form = document.getElementById('taskForm');
 const titleInput = document.getElementById('titleInput');
 const descriptionInput = document.getElementById('descriptionInput');
+const priorityInput = document.getElementById('priorityInput');
 const submitBtn = document.getElementById('submitBtn');
 const taskList = document.getElementById('taskList');
 const loadingIndicator = document.getElementById('loadingIndicator');
 const emptyState = document.getElementById('emptyState');
-const errorState = document.getElementById('errorState');
 const statusFilter = document.getElementById('statusFilter');
+const priorityFilter = document.getElementById('priorityFilter');
 const sortOrder = document.getElementById('sortOrder');
+const searchInput = document.getElementById('searchInput');
 const connectionStatus = document.getElementById('connectionStatus');
 const statTotal = document.getElementById('statTotal');
 const statTodo = document.getElementById('statTodo');
@@ -54,7 +57,6 @@ async function apiRequest(path, options = {}) {
     }
     isOnline = false;
     updateConnectionStatus();
-    showErrorState();
     return mockRequest(path, options);
   }
 }
@@ -62,24 +64,26 @@ async function apiRequest(path, options = {}) {
 function mockRequest(path, options) {
   const method = (options.method || 'GET').toUpperCase();
 
-  if (method === 'GET') {
-    if (path === '/tasks') {
-      let filtered = [...mockData];
-      return { data: filtered, stats: computeStats(filtered) };
-    }
+  if (path.startsWith('/tasks/') && method === 'GET') {
     const id = path.split('/').pop();
     const task = mockData.find(t => t.id === id);
     if (!task) throw new Error('Task not found');
     return { data: task };
   }
 
-  if (method === 'POST') {
+  if (path === '/tasks' && method === 'GET') {
+    let filtered = [...mockData];
+    return { data: filtered, stats: computeStats(filtered) };
+  }
+
+  if (path === '/tasks' && method === 'POST') {
     const body = JSON.parse(options.body || '{}');
     const task = {
       id: generateId(),
       title: body.title,
       description: body.description || '',
       status: 'todo',
+      priority: body.priority || 'medium',
       created_at: getNow(),
       updated_at: getNow(),
     };
@@ -87,7 +91,7 @@ function mockRequest(path, options) {
     return { data: task };
   }
 
-  if (method === 'PUT') {
+  if (path.startsWith('/tasks/') && method === 'PUT') {
     const id = path.split('/').pop();
     const idx = mockData.findIndex(t => t.id === id);
     if (idx === -1) throw new Error('Task not found');
@@ -96,7 +100,7 @@ function mockRequest(path, options) {
     return { data: mockData[idx] };
   }
 
-  if (method === 'DELETE') {
+  if (path.startsWith('/tasks/') && method === 'DELETE') {
     const id = path.split('/').pop();
     const idx = mockData.findIndex(t => t.id === id);
     if (idx === -1) throw new Error('Task not found');
@@ -117,14 +121,18 @@ function computeStats(data) {
 }
 
 function updateConnectionStatus() {
-  connectionStatus.textContent = isOnline ? 'Connected' : 'Offline';
-  connectionStatus.className = 'connection-status ' + (isOnline ? 'online' : 'offline');
+  if (isOnline) {
+    connectionStatus.textContent = 'Connected';
+    connectionStatus.className = 'connection-status online';
+  } else {
+    connectionStatus.textContent = 'Offline';
+    connectionStatus.className = 'connection-status offline';
+  }
 }
 
 function showLoading() {
   loadingIndicator.classList.remove('hidden');
   emptyState.classList.add('hidden');
-  errorState.classList.add('hidden');
 }
 
 function hideLoading() {
@@ -133,13 +141,6 @@ function hideLoading() {
 
 function showEmptyState() {
   emptyState.classList.remove('hidden');
-  errorState.classList.add('hidden');
-}
-
-function showErrorState() {
-  errorState.classList.remove('hidden');
-  emptyState.classList.add('hidden');
-  loadingIndicator.classList.add('hidden');
 }
 
 function updateStats(stats) {
@@ -154,9 +155,14 @@ function getStatusLabel(status) {
   return labels[status] || status;
 }
 
+function getPriorityLabel(priority) {
+  return priority ? priority.charAt(0).toUpperCase() + priority.slice(1) : '';
+}
+
 function renderTasks() {
   const filtered = filterTasks();
-  const sorted = sortTasks(filtered);
+  const searched = searchTasks(filtered);
+  const sorted = sortTasks(searched);
 
   taskList.innerHTML = '';
 
@@ -167,31 +173,34 @@ function renderTasks() {
 
   hideLoading();
   emptyState.classList.add('hidden');
-  errorState.classList.add('hidden');
 
   sorted.forEach(task => {
     const card = document.createElement('div');
     card.className = 'task-card';
 
-    const statusOrder = ['todo', 'in-progress', 'done'];
-    const nextStatus = statusOrder[(statusOrder.indexOf(task.status) + 1) % statusOrder.length];
     const isDone = task.status === 'done';
+    const statuses = ['todo', 'in-progress', 'done'];
 
     card.innerHTML = `
       <div class="task-body">
         <div class="task-title ${isDone ? 'done-text' : ''}">${escapeHtml(task.title)}</div>
         ${task.description ? `<div class="task-desc">${escapeHtml(task.description)}</div>` : ''}
-        <div class="task-meta">${getStatusLabel(task.status)} · ${formatDate(task.created_at)}</div>
+        <div class="task-meta">
+          <span class="priority-badge ${task.priority || 'medium'}">${getPriorityLabel(task.priority)}</span>
+          <span>${formatDate(task.created_at)}</span>
+        </div>
       </div>
       <div class="task-actions">
-        <button class="btn-status active-${task.status}" data-id="${task.id}" data-next="${nextStatus}" title="Move to ${getStatusLabel(nextStatus)}">
-          ${getStatusLabel(nextStatus)}
-        </button>
-        <button class="btn-delete" data-id="${task.id}" title="Delete task">✕</button>
+        ${statuses.map(s => `
+          <button class="btn-status ${s === task.status ? 'active ' : ''}is-${s}" data-id="${task.id}" data-status="${s}">${getStatusLabel(s)}</button>
+        `).join('')}
+        <button class="btn-delete" data-id="${task.id}" title="Delete">✕</button>
       </div>
     `;
 
-    card.querySelector('.btn-status').addEventListener('click', () => updateTaskStatus(task.id, nextStatus));
+    card.querySelectorAll('.btn-status').forEach(btn => {
+      btn.addEventListener('click', () => updateTaskStatus(task.id, btn.dataset.status));
+    });
     card.querySelector('.btn-delete').addEventListener('click', () => deleteTask(task.id));
 
     taskList.appendChild(card);
@@ -210,9 +219,25 @@ function formatDate(dateStr) {
 }
 
 function filterTasks() {
-  const filter = statusFilter.value;
-  if (filter === 'all') return [...tasks];
-  return tasks.filter(t => t.status === filter);
+  let filtered = [...tasks];
+  const sf = statusFilter.value;
+  if (sf !== 'all') {
+    filtered = filtered.filter(t => t.status === sf);
+  }
+  const pf = priorityFilter.value;
+  if (pf !== 'all') {
+    filtered = filtered.filter(t => t.priority === pf);
+  }
+  return filtered;
+}
+
+function searchTasks(list) {
+  const q = searchInput.value.trim().toLowerCase();
+  if (!q) return list;
+  return list.filter(t =>
+    t.title.toLowerCase().includes(q) ||
+    (t.description && t.description.toLowerCase().includes(q))
+  );
 }
 
 function sortTasks(list) {
@@ -234,25 +259,26 @@ async function loadTasks() {
     updateStats(res.stats);
     renderTasks();
     hideLoading();
-
     if (tasks.length === 0) {
       showEmptyState();
     }
   } catch (err) {
-    showErrorState();
+    renderTasks();
+    hideLoading();
   }
 }
 
-async function createTask(title, description) {
+async function createTask(title, description, priority) {
   submitBtn.disabled = true;
   submitBtn.textContent = 'Adding...';
   try {
     await apiRequest('/tasks', {
       method: 'POST',
-      body: JSON.stringify({ title, description }),
+      body: JSON.stringify({ title, description, priority }),
     });
     titleInput.value = '';
     descriptionInput.value = '';
+    priorityInput.value = 'medium';
     await loadTasks();
   } catch (err) {
     console.error(err);
@@ -262,11 +288,13 @@ async function createTask(title, description) {
   }
 }
 
-async function updateTaskStatus(id, nextStatus) {
+async function updateTaskStatus(id, status) {
+  const prev = tasks.find(t => t.id === id);
+  if (prev && prev.status === status) return;
   try {
     await apiRequest(`/tasks/${id}`, {
       method: 'PUT',
-      body: JSON.stringify({ status: nextStatus }),
+      body: JSON.stringify({ status }),
     });
     await loadTasks();
   } catch (err) {
@@ -287,12 +315,19 @@ form.addEventListener('submit', (e) => {
   e.preventDefault();
   const title = titleInput.value.trim();
   const description = descriptionInput.value.trim();
+  const priority = priorityInput.value;
   if (!title) return;
-  createTask(title, description);
+  createTask(title, description, priority);
 });
 
 statusFilter.addEventListener('change', renderTasks);
+priorityFilter.addEventListener('change', renderTasks);
 sortOrder.addEventListener('change', renderTasks);
+
+searchInput.addEventListener('input', () => {
+  clearTimeout(searchTimeout);
+  searchTimeout = setTimeout(renderTasks, 200);
+});
 
 updateConnectionStatus();
 loadTasks();

@@ -3,10 +3,11 @@ const TaskService = require('../services/taskService');
 class TaskController {
   static async getAll(req, res, next) {
     try {
-      const { status, sortBy, order } = req.query;
-      const tasks = await TaskService.getAll({ status, sortBy, order });
-      const stats = await TaskService.getStats();
-      res.json({ data: tasks, stats });
+      const { status, priority, sortBy, order, query, limit, offset } = req.query;
+      const tasks = await TaskService.getAll({ status, priority, sortBy, order, query, limit, offset });
+      const stats = await TaskService.getStats({ status, priority, query });
+      const priorities = await TaskService.getPriorities();
+      res.json({ data: tasks, stats, priorities });
     } catch (err) {
       next(err);
     }

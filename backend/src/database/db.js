@@ -18,9 +18,15 @@ db.exec(`
     title TEXT NOT NULL,
     description TEXT DEFAULT '',
     status TEXT NOT NULL DEFAULT 'todo' CHECK(status IN ('todo', 'in-progress', 'done')),
+    priority TEXT NOT NULL DEFAULT 'medium' CHECK(priority IN ('low', 'medium', 'high')),
     created_at TEXT NOT NULL DEFAULT (datetime('now')),
     updated_at TEXT NOT NULL DEFAULT (datetime('now'))
   )
 `);
+
+const hasPriority = db.prepare("SELECT COUNT(*) AS c FROM pragma_table_info('tasks') WHERE name = 'priority'").get().c > 0;
+if (!hasPriority) {
+  db.exec("ALTER TABLE tasks ADD COLUMN priority TEXT NOT NULL DEFAULT 'medium' CHECK(priority IN ('low', 'medium', 'high'))");
+}
 
 module.exports = db;

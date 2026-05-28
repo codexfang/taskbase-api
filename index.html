@@ -27,19 +27,36 @@
         <div class="form-row">
           <input type="text" id="titleInput" placeholder="Task title" required maxlength="200" />
           <input type="text" id="descriptionInput" placeholder="Description (optional)" />
+          <select id="priorityInput">
+            <option value="low">Low</option>
+            <option value="medium" selected>Medium</option>
+            <option value="high">High</option>
+          </select>
           <button type="submit" id="submitBtn">Add Task</button>
         </div>
       </form>
     </section>
 
     <section class="controls">
+      <div class="filter-group search-group">
+        <input type="text" id="searchInput" placeholder="Search tasks..." />
+      </div>
       <div class="filter-group">
-        <label for="statusFilter">Filter</label>
+        <label for="statusFilter">Status</label>
         <select id="statusFilter">
           <option value="all">All</option>
           <option value="todo">Todo</option>
           <option value="in-progress">In Progress</option>
           <option value="done">Done</option>
+        </select>
+      </div>
+      <div class="filter-group">
+        <label for="priorityFilter">Priority</label>
+        <select id="priorityFilter">
+          <option value="all">All</option>
+          <option value="high">High</option>
+          <option value="medium">Medium</option>
+          <option value="low">Low</option>
         </select>
       </div>
       <div class="filter-group">
@@ -55,10 +72,6 @@
       <div id="loadingIndicator" class="loading hidden">Loading tasks...</div>
       <div id="emptyState" class="empty-state hidden">
         <p>No tasks yet. Create one above.</p>
-      </div>
-      <div id="errorState" class="error-state hidden">
-        <p>Unable to connect to the server.</p>
-        <p class="sub-text">Running in offline mode. Data will not be persisted.</p>
       </div>
       <div id="taskList" class="task-list"></div>
     </section>

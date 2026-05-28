@@ -1,5 +1,5 @@
 function validateCreate(req, res, next) {
-  const { title } = req.body;
+  const { title, priority } = req.body;
 
   if (!title || typeof title !== 'string' || title.trim().length === 0) {
     return res.status(400).json({ error: 'Title is required and must be a non-empty string' });
@@ -13,6 +13,13 @@ function validateCreate(req, res, next) {
     return res.status(400).json({ error: 'Description must be a string' });
   }
 
+  if (priority !== undefined) {
+    const allowed = ['low', 'medium', 'high'];
+    if (!allowed.includes(priority)) {
+      return res.status(400).json({ error: 'Priority must be: low, medium, or high' });
+    }
+  }
+
   req.body.title = title.trim();
   if (req.body.description) req.body.description = req.body.description.trim();
 
@@ -20,7 +27,7 @@ function validateCreate(req, res, next) {
 }
 
 function validateUpdate(req, res, next) {
-  const { title, description, status } = req.body;
+  const { title, description, status, priority } = req.body;
 
   if (title !== undefined) {
     if (typeof title !== 'string' || title.trim().length === 0) {
@@ -43,6 +50,13 @@ function validateUpdate(req, res, next) {
     const allowed = ['todo', 'in-progress', 'done'];
     if (!allowed.includes(status)) {
       return res.status(400).json({ error: 'Status must be: todo, in-progress, or done' });
+    }
+  }
+
+  if (priority !== undefined) {
+    const allowed = ['low', 'medium', 'high'];
+    if (!allowed.includes(priority)) {
+      return res.status(400).json({ error: 'Priority must be: low, medium, or high' });
     }
   }
 
