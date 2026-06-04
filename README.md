@@ -31,6 +31,4 @@ A production-style task management system with a RESTful backend API built with 
 | DELETE | `/api/tasks/:id` | Delete a task |
 | GET | `/api/health` | Health check |
 
-## License
 
-MIT

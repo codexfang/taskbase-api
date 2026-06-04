@@ -400,6 +400,47 @@ header {
   border-color: var(--danger);
 }
 
+@keyframes task-new-flash {
+  0% { background-color: rgba(88, 166, 255, 0.12); border-color: var(--accent); }
+  100% { background-color: var(--surface); border-color: var(--border); }
+}
+
+.task-new {
+  animation: task-new-flash 2s ease-out forwards;
+}
+
+.toast {
+  position: fixed;
+  bottom: 24px;
+  left: 50%;
+  transform: translateX(-50%) translateY(16px);
+  padding: 10px 20px;
+  border-radius: var(--radius);
+  font-size: 0.85rem;
+  font-weight: 500;
+  z-index: 1000;
+  opacity: 0;
+  transition: opacity 300ms ease, transform 300ms ease;
+  pointer-events: none;
+}
+
+.toast.toast-visible {
+  opacity: 1;
+  transform: translateX(-50%) translateY(0);
+}
+
+.toast-success {
+  background: rgba(63, 185, 80, 0.15);
+  color: var(--done);
+  border: 1px solid rgba(63, 185, 80, 0.3);
+}
+
+.toast-error {
+  background: rgba(248, 81, 73, 0.15);
+  color: var(--danger);
+  border: 1px solid rgba(248, 81, 73, 0.3);
+}
+
 @media (max-width: 640px) {
   .container {
     padding: 0 14px;

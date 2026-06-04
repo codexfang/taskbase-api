@@ -4,6 +4,7 @@ let tasks = [];
 let isOnline = true;
 let mockData = [];
 let searchTimeout = null;
+let highlightId = null;
 
 const form = document.getElementById('taskForm');
 const titleInput = document.getElementById('titleInput');
@@ -152,6 +153,17 @@ function updateStats(stats) {
   statDone.textContent = stats.done;
 }
 
+function showToast(message, type = 'success') {
+  const existing = document.querySelector('.toast');
+  if (existing) existing.remove();
+  const toast = document.createElement('div');
+  toast.className = `toast toast-${type}`;
+  toast.textContent = message;
+  document.body.appendChild(toast);
+  requestAnimationFrame(() => toast.classList.add('toast-visible'));
+  setTimeout(() => { toast.classList.remove('toast-visible'); setTimeout(() => toast.remove(), 300); }, 3000);
+}
+
 function getStatusLabel(status) {
   const labels = { 'todo': 'Todo', 'in-progress': 'Progress', 'done': 'Done' };
   return labels[status] || status;
@@ -178,7 +190,7 @@ function renderTasks() {
 
   sorted.forEach(task => {
     const card = document.createElement('div');
-    card.className = 'task-card';
+    card.className = `task-card${task.id === highlightId ? ' task-new' : ''}`;
 
     const isDone = task.status === 'done';
     const statuses = ['todo', 'in-progress', 'done'];
@@ -207,6 +219,15 @@ function renderTasks() {
 
     taskList.appendChild(card);
   });
+
+  if (highlightId) {
+    const id = highlightId;
+    setTimeout(() => {
+      const el = taskList.querySelector('.task-new');
+      if (el) el.classList.remove('task-new');
+      if (highlightId === id) highlightId = null;
+    }, 2000);
+  }
 }
 
 function escapeHtml(text) {
@@ -274,16 +295,18 @@ async function createTask(title, description, priority) {
   submitBtn.disabled = true;
   submitBtn.textContent = 'Adding...';
   try {
-    await apiRequest('/tasks', {
+    const res = await apiRequest('/tasks', {
       method: 'POST',
       body: JSON.stringify({ title, description, priority }),
     });
+    highlightId = res.data.id;
     titleInput.value = '';
     descriptionInput.value = '';
     priorityInput.value = 'medium';
     await loadTasks();
+    showToast('Task created');
   } catch (err) {
-    console.error(err);
+    showToast(err.message || 'Failed to create task', 'error');
   } finally {
     submitBtn.disabled = false;
     submitBtn.textContent = 'Add Task';
@@ -293,14 +316,16 @@ async function createTask(title, description, priority) {
 async function updateTaskStatus(id, status) {
   const prev = tasks.find(t => t.id === id);
   if (prev && prev.status === status) return;
+  highlightId = id;
   try {
     await apiRequest(`/tasks/${id}`, {
       method: 'PUT',
       body: JSON.stringify({ status }),
     });
     await loadTasks();
+    showToast('Task updated');
   } catch (err) {
-    console.error(err);
+    showToast(err.message || 'Failed to update task', 'error');
   }
 }
 
@@ -308,8 +333,9 @@ async function deleteTask(id) {
   try {
     await apiRequest(`/tasks/${id}`, { method: 'DELETE' });
     await loadTasks();
+    showToast('Task deleted');
   } catch (err) {
-    console.error(err);
+    showToast(err.message || 'Failed to delete task', 'error');
   }
 }
 
