@@ -1,94 +1,105 @@
+const initSqlJs = require('sql.js');
 const path = require('path');
 const fs = require('fs');
 
-const USE_PG = !!process.env.DATABASE_URL;
+let db = null;
 
-let sqlite;
-let pgPool;
+const dataDir = path.join(__dirname, '..', '..', 'data');
+const dbPath = path.join(dataDir, 'taskbase.db');
 
-if (USE_PG) {
-  const { Pool } = require('pg');
-  pgPool = new Pool({ connectionString: process.env.DATABASE_URL });
-} else {
-  const Database = require('better-sqlite3');
-  const dataDir = path.join(__dirname, '..', '..', 'data');
-  const dbPath = path.join(dataDir, 'taskbase.db');
+async function getDb() {
+  if (db) return db;
+  const SQL = await initSqlJs();
   fs.mkdirSync(dataDir, { recursive: true });
-  sqlite = new Database(dbPath);
-  sqlite.pragma('journal_mode = WAL');
-  sqlite.pragma('foreign_keys = ON');
+  if (fs.existsSync(dbPath)) {
+    const buffer = fs.readFileSync(dbPath);
+    db = new SQL.Database(buffer);
+  } else {
+    db = new SQL.Database();
+  }
+  return db;
 }
 
-function toPg(sql) {
-  let i = 0;
-  return sql.replace(/\?/g, () => `$${++i}`);
-}
-
-function toPgTs(sql) {
-  return sql
-    .replace(/datetime\('now'\)/g, "NOW()")
-    .replace(/datetime\('now'/g, "NOW()");
+function save() {
+  if (!db) return;
+  const data = db.export();
+  fs.mkdirSync(dataDir, { recursive: true });
+  fs.writeFileSync(dbPath, Buffer.from(data));
 }
 
 async function query(sql, params = []) {
-  if (USE_PG) {
-    const result = await pgPool.query(toPgTs(toPg(sql)), params);
-    return result.rows;
+  const d = await getDb();
+  const stmt = d.prepare(sql);
+  if (params.length > 0) {
+    stmt.bind(params);
   }
-  return sqlite.prepare(sql).all(...params);
+  const rows = [];
+  while (stmt.step()) {
+    rows.push(stmt.getAsObject());
+  }
+  stmt.free();
+  return rows;
 }
 
 async function get(sql, params = []) {
-  if (USE_PG) {
-    const result = await pgPool.query(toPgTs(toPg(sql)), params);
-    return result.rows[0] || null;
-  }
-  const row = sqlite.prepare(sql).get(...params);
-  return row || null;
+  const rows = await query(sql, params);
+  return rows.length > 0 ? rows[0] : null;
 }
 
 async function run(sql, params = []) {
-  if (USE_PG) {
-    await pgPool.query(toPgTs(toPg(sql)), params);
-    return { changes: 1 };
+  const d = await getDb();
+  if (params.length > 0) {
+    d.run(sql, params);
+  } else {
+    d.run(sql);
   }
-  sqlite.prepare(sql).run(...params);
-  return { changes: sqlite.changes };
+  save();
+  return { changes: d.getRowsModified() };
 }
 
 async function migrate() {
-  if (USE_PG) {
-    await pgPool.query(`
-      CREATE TABLE IF NOT EXISTS tasks (
-        id TEXT PRIMARY KEY,
-        title TEXT NOT NULL,
-        description TEXT DEFAULT '',
-        status TEXT NOT NULL DEFAULT 'todo' CHECK(status IN ('todo', 'in-progress', 'done')),
-        priority TEXT NOT NULL DEFAULT 'medium' CHECK(priority IN ('low', 'medium', 'high')),
-        created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-        updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
-      )
-    `);
-  } else {
-    sqlite.exec(`
-      CREATE TABLE IF NOT EXISTS tasks (
-        id TEXT PRIMARY KEY,
-        title TEXT NOT NULL,
-        description TEXT DEFAULT '',
-        status TEXT NOT NULL DEFAULT 'todo' CHECK(status IN ('todo', 'in-progress', 'done')),
-        priority TEXT NOT NULL DEFAULT 'medium' CHECK(priority IN ('low', 'medium', 'high')),
-        created_at TEXT NOT NULL DEFAULT (datetime('now')),
-        updated_at TEXT NOT NULL DEFAULT (datetime('now'))
-      )
-    `);
+  const d = await getDb();
 
-    const hasPriority = sqlite.prepare(
+  d.run(`CREATE TABLE IF NOT EXISTS tasks (
+    id TEXT PRIMARY KEY,
+    title TEXT NOT NULL,
+    description TEXT DEFAULT '',
+    status TEXT NOT NULL DEFAULT 'todo' CHECK(status IN ('todo', 'in-progress', 'done')),
+    priority TEXT NOT NULL DEFAULT 'medium' CHECK(priority IN ('low', 'medium', 'high')),
+    created_at TEXT NOT NULL DEFAULT (datetime('now')),
+    updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+  )`);
+
+  let hasPriority = false;
+  try {
+    const r = d.exec(
       "SELECT COUNT(*) AS c FROM pragma_table_info('tasks') WHERE name = 'priority'"
-    ).get().c > 0;
-    if (!hasPriority) {
-      sqlite.exec("ALTER TABLE tasks ADD COLUMN priority TEXT NOT NULL DEFAULT 'medium' CHECK(priority IN ('low', 'medium', 'high'))");
+    );
+    if (r.length > 0 && r[0].values.length > 0) {
+      hasPriority = r[0].values[0][0] > 0;
+    }
+  } catch {
+    try {
+      const stmt = d.prepare(
+        "SELECT COUNT(*) AS c FROM pragma_table_info('tasks') WHERE name = 'priority'"
+      );
+      stmt.bind([]);
+      if (stmt.step()) {
+        hasPriority = stmt.getAsObject().c > 0;
+      }
+      stmt.free();
+    } catch {
+      // pragma_table_info not available
     }
   }
+
+  if (!hasPriority) {
+    d.run(
+      "ALTER TABLE tasks ADD COLUMN priority TEXT NOT NULL DEFAULT 'medium' CHECK(priority IN ('low', 'medium', 'high'))"
+    );
+  }
+
+  save();
 }
 
 module.exports = { query, get, run, migrate };

@@ -15,17 +15,6 @@ app.get('/api/health', (_req, res) => {
   res.json({ status: 'ok' });
 });
 
-app.get('/api/debug', async (_req, res) => {
-  try {
-    const db = require('./database/client');
-    const tasks = await db.query('SELECT name FROM sqlite_master WHERE type=\'table\'');
-    const result = await db.query('SELECT * FROM tasks LIMIT 1');
-    res.json({ ok: true, tables: tasks, sample: result, cwd: process.cwd(), dir: __dirname });
-  } catch (err) {
-    res.status(500).json({ ok: false, error: err.message, stack: err.stack });
-  }
-});
-
 const frontendPath = path.join(__dirname, '..', '..');
 app.use(express.static(frontendPath));
 
